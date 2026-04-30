@@ -1,54 +1,40 @@
 import cv2
 import mediapipe as mp
-import numpy as np
-import time
-from ultralytics import YOLO
 
-print("Starting Quarrel Detection...")
+from motion.motion_detector import calculate_motion
+from detection.quarrel_detector import detect_quarrel
+from alerts.alert_system import send_alert
 
-# Load YOLO model
-model = YOLO("yolov8n.pt")
+print("Starting Quarrel Detection (Modular)...")
 
 mp_pose = mp.solutions.pose
 mp_drawing = mp.solutions.drawing_utils
 pose = mp_pose.Pose()
 
+face_cascade = cv2.CascadeClassifier(
+    cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+)
+
 cap = cv2.VideoCapture(0)
 
 prev_landmarks = None
-start_time = None
-
-def calculate_motion(prev, curr):
-    motion = 0
-    for p, c in zip(prev, curr):
-        motion += np.linalg.norm(np.array(p) - np.array(c))
-    return motion
-
-def calculate_distance(p1, p2):
-    return np.linalg.norm(np.array(p1) - np.array(p2))
 
 while True:
     ret, frame = cap.read()
     if not ret:
         break
 
-    # YOLO person detection
-    results = model(frame)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 
-    people_centers = []
+    centers = []
 
-    for r in results:
-        for box in r.boxes:
-            cls = int(box.cls[0])
-            if cls == 0:  # person
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                cx = (x1 + x2) // 2
-                cy = (y1 + y2) // 2
-                people_centers.append((cx, cy))
+    for (x, y, w, h) in faces:
+        cx = x + w // 2
+        cy = y + h // 2
+        centers.append((cx, cy))
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
 
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (255,0,0), 2)
-
-    # Pose detection (single for now)
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     result = pose.process(rgb)
 
@@ -64,22 +50,14 @@ while True:
         if prev_landmarks:
             motion_score = calculate_motion(prev_landmarks, landmarks)
 
-            cv2.putText(frame, f"Motion: {motion_score:.2f}", (10,30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+            cv2.putText(frame, f"Motion: {motion_score:.2f}", (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
-            # 🔥 Interaction logic
-            if len(people_centers) >= 2:
-                dist = calculate_distance(people_centers[0], people_centers[1])
+            if detect_quarrel(motion_score, centers):
+                cv2.putText(frame, "QUARREL DETECTED", (50, 80),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
-                if motion_score > 0.6 and dist < 150:
-                    if start_time is None:
-                        start_time = time.time()
-
-                    if time.time() - start_time > 2:
-                        cv2.putText(frame, "⚠️ QUARREL DETECTED", (50,80),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
-                else:
-                    start_time = None
+                send_alert()
 
         prev_landmarks = landmarks
 
