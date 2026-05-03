@@ -1,21 +1,22 @@
-import time
-from utils.helpers import calculate_distance
+def check_interaction(centers, prev_centers):
+    if len(centers) < 2 or prev_centers is None:
+        return False, 0
 
-start_time = None
+    interaction_score = 0
 
-def detect_quarrel(motion_score, centers):
-    global start_time
+    for i in range(len(centers)):
+        for j in range(i + 1, len(centers)):
+            x1, y1 = centers[i]
+            x2, y2 = centers[j]
 
-    if len(centers) >= 2:
-        dist = calculate_distance(centers[0], centers[1])
+            px1, py1 = prev_centers[i]
+            px2, py2 = prev_centers[j]
 
-        if motion_score > 0.6 and dist < 200:
-            if start_time is None:
-                start_time = time.time()
+            dist_now = ((x1 - x2)**2 + (y1 - y2)**2) ** 0.5
+            dist_prev = ((px1 - px2)**2 + (py1 - py2)**2) ** 0.5
 
-            if time.time() - start_time > 2:
-                return True
-        else:
-            start_time = None
+            # moving closer
+            if dist_prev - dist_now > 10:
+                interaction_score += 1
 
-    return False
+    return interaction_score > 0, interaction_score
