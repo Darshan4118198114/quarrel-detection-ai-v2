@@ -20,6 +20,6 @@ def detect_body_aggression(prev_points, curr_points):
     motion = calculate_body_motion(prev_points, curr_points)
 
     # 🔥 stronger logic
-    aggressive = motion > 0.02   # increase sensitivity
+    aggressive = motion > 0.09   # increase sensitivity
 
     return aggressive, motion
