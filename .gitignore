@@ -1,4 +1,9 @@
 venv/
+qd/
 __pycache__/
 *.pyc
 .env
+events.log
+incidents/
+test_incidents/
+.vscode/
